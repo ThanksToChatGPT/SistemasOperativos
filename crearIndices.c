@@ -1,23 +1,19 @@
 // Genera index.csv: 350 líneas, cada una con offsets (en bytes) separados por comas
-// correspondientes a la primera canción de cada artista en ese bucket.
-//
-// Uso
-//
+// correspondientes a la primera canción de cada artista en ese bucket
 // Notas:
 // - Abre songs.csv en "rb" para que ftell/offset sea consistente (Windows/Linux).
 // - Usa getline (requiere -D_GNU_SOURCE en GCC).
+// - Parser robusto para bucket (col 0) y artist (col 1) con comillas.
 
-
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
-#define NUM_BUCKETS 350
-#define MAX_ARTIST  512
+#define NUM_BUCKETS 350 // Número total de cubetas de hash a utilizar (0 a 349).
+#define MAX_ARTIST  512 // Tamaño máximo del buffer para el nombre del artista.
 
-// --------- Vector dinámico para offsets por bucket ----------
+//  Vector dinámico
 typedef struct {
     long   *data;                     // offsets (inicio de fila en songs.csv)
     size_t  size;                     // número de offsets
@@ -25,6 +21,7 @@ typedef struct {
     char    last_artist[MAX_ARTIST];  // último artista visto en este bucket
 } BucketVec;
 
+// iniciar el vector
 static void vec_init(BucketVec *v) {
     v->data = NULL;
     v->size = 0;
@@ -32,9 +29,11 @@ static void vec_init(BucketVec *v) {
     v->last_artist[0] = '\0';
 }
 
+// Agrega un nuevo offset al vector, reasignando memoria si es necesario (crecimiento dinámico x2).
 static void vec_push(BucketVec *v, long value) {
     if (v->size == v->cap) {
-        size_t newcap = v->cap ? v->cap * 2 : 64;
+        // duplicar la capacidad o dejarla en 64 
+        size_t newcap = v->cap ? v->cap * 2 : 64; 
         long *p = (long *)realloc(v->data, newcap * sizeof(long));
         if (!p) {
             fprintf(stderr, "Fallo realloc: %s\n", strerror(errno));
@@ -46,13 +45,14 @@ static void vec_push(BucketVec *v, long value) {
     v->data[v->size++] = value;
 }
 
+//liberar la memoria dinamica del vector
 static void vec_free(BucketVec *v) {
     free(v->data);
     v->data = NULL;
     v->size = v->cap = 0;
 }
 
-// --------- Parser: bucket (col 0) y artista (col 1) con comillas ----------
+//  Parser: bucket (col 0) y artista (col 1) con comillas 
 static int parse_line_bucket_artist(const char *line, int *bucket_out, char *artist_out) {
     const char *p = line;
 
@@ -63,7 +63,7 @@ static int parse_line_bucket_artist(const char *line, int *bucket_out, char *art
         if (ti < (int)sizeof(tmp) - 1) tmp[ti++] = *p;
         p++;
     }
-    if (*p != ',') return 0; // línea mal formada
+    if (*p != ',') return -1; // línea mal formada
     tmp[ti] = '\0';
     *bucket_out = atoi(tmp);
     p++; // saltar coma
@@ -83,7 +83,6 @@ static int parse_line_bucket_artist(const char *line, int *bucket_out, char *art
                 continue;
             }
             if (*p == ',') { p++; break; } // cierre + coma
-            break;                          // cierre sin coma (fin campo)
         } else if (!in_quotes && *p == ',') {
             p++; // fin de campo sin comillas
             break;
@@ -93,20 +92,21 @@ static int parse_line_bucket_artist(const char *line, int *bucket_out, char *art
         p++;
     }
     artist_out[ai] = '\0';
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv) {
-    const char *songs_csv = (argc > 1) ? argv[1] : "songs.csv";
-    const char *index_csv = (argc > 2) ? argv[2] : "index.csv";
+    const char *songs_csv = "songs.csv";
+    const char *index_csv = "index.csv";
 
     FILE *fsongs = fopen(songs_csv, "rb"); // binario para offsets correctos
     if (!fsongs) {
         fprintf(stderr, "No se pudo abrir '%s': %s\n", songs_csv, strerror(errno));
-        return 1;
+        return -1;
     }
-
+    //un arreglo de vectores
     BucketVec buckets[NUM_BUCKETS];
+
     for (int i = 0; i < NUM_BUCKETS; ++i) vec_init(&buckets[i]);
 
     // Contador total de índices (primeras canciones por artista)
@@ -122,23 +122,23 @@ int main(int argc, char **argv) {
     if (nread < 0) {
         fprintf(stderr, "CSV vacío o error al leer encabezado.\n");
         fclose(fsongs);
-        return 1;
+        return -1;
     }
 
     // 2) Recorrer archivo línea por línea
     for (;;) {
-        line_offset = ftell(fsongs);          // inicio REAL de la fila
+        line_offset = ftell(fsongs);          // offset de la linea
         nread = getline(&line, &cap, fsongs); // fila completa
         if (nread < 0) break;                 // EOF
 
         int  bucket = -1;
         char artist[MAX_ARTIST];
-        if (!parse_line_bucket_artist(line, &bucket, artist)) continue;
+        if (parse_line_bucket_artist(line, &bucket, artist)!= 0) continue;
         if (bucket < 0 || bucket >= NUM_BUCKETS) continue;
 
         BucketVec *bv = &buckets[bucket];
 
-        // Si cambió el artista en este bucket → es la primera canción de ese artista
+        // Si cambió el artista en este bucket = es la primera canción de ese artista
         if (strcmp(bv->last_artist, artist) != 0) {
             vec_push(bv, line_offset);
             strncpy(bv->last_artist, artist, MAX_ARTIST - 1);
@@ -155,14 +155,14 @@ int main(int argc, char **argv) {
     if (!fidx) {
         fprintf(stderr, "No se pudo crear '%s': %s\n", index_csv, strerror(errno));
         for (int i = 0; i < NUM_BUCKETS; ++i) vec_free(&buckets[i]);
-        return 1;
+        return -1;
     }
 
-    for (int b = 0; b < NUM_BUCKETS; ++b) {
-        BucketVec *bv = &buckets[b];
-        for (size_t i = 0; i < bv->size; ++i) {
-            if (i > 0) fputc(',', fidx);
-            fprintf(fidx, "%ld", bv->data[i]);
+    for (int i = 0; i < NUM_BUCKETS; ++i) {
+        BucketVec *bv = &buckets[i];
+        for (size_t j = 0; j < bv->size; ++j) {
+            if (j > 0) fputc(',', fidx);
+            fprintf(fidx, "%ld", bv->data[j]);
         }
         fputc('\n', fidx);
     }
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
     // 4) Liberar memoria
     for (int i = 0; i < NUM_BUCKETS; ++i) vec_free(&buckets[i]);
 
-    printf("✅ Índice generado en '%s'\n", index_csv);
+    printf("Indice generado en '%s'\n", index_csv);
     printf("Total de índices creados: %ld\n", total_indices);
     return 0;
 }

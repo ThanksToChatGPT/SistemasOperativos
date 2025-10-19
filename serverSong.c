@@ -16,9 +16,36 @@
 #define FIFO_SERVER_TO_CLIENT "/tmp/server_to_client"
 
 // --- HASH MD5 → bucket (0–349) ---
+// Nueva versión: normaliza el nombre del artista (quita comillas/espacios y pasa a minúsculas)
 int hash_mod350(const char *artist) {
+    char tmp[MAX_ARTIST];
+    strncpy(tmp, artist, MAX_ARTIST - 1);
+    tmp[MAX_ARTIST - 1] = '\0';
+
+    // Quitar saltos y espacios al final
+    size_t len = strlen(tmp);
+    while (len > 0 && (tmp[len - 1] == '\n' || tmp[len - 1] == '\r' || isspace((unsigned char)tmp[len - 1])))
+        tmp[--len] = '\0';
+
+    // Quitar espacios al inicio
+    char *start = tmp;
+    while (*start && isspace((unsigned char)*start)) start++;
+
+    // Eliminar comillas exteriores si existen
+    if (start[0] == '"') {
+        size_t slen = strlen(start);
+        if (slen > 1 && start[slen - 1] == '"') {
+            start[slen - 1] = '\0';
+            memmove(start, start + 1, slen - 1);
+        }
+    }
+
+    // Pasar a minúsculas para normalizar
+    for (char *p = start; *p; ++p) *p = tolower((unsigned char)*p);
+
+    // Calcular MD5 sobre la cadena normalizada
     unsigned char digest[MD5_DIGEST_LENGTH];
-    MD5((unsigned char*)artist, strlen(artist), digest);
+    MD5((unsigned char*)start, strlen(start), digest);
 
     unsigned long val = 0;
     for (int i = 0; i < 3; i++) {

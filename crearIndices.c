@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
+#include <openssl/md5.h>
 
 #define NUM_BUCKETS 350 // Número total de cubetas de hash a utilizar (0 a 349).
 #define MAX_ARTIST  512 // Tamaño máximo del buffer para el nombre del artista.
@@ -93,6 +95,50 @@ static int parse_line_bucket_artist(const char *line, int *bucket_out, char *art
     }
     artist_out[ai] = '\0';
     return 0;
+}
+
+// --- Normaliza artista: quita comillas/espacios y pasa a minúsculas ---
+void normalize_artist(const char *src, char *dst, size_t dst_size) {
+    // Copiar y garantizar terminación
+    strncpy(dst, src, dst_size - 1);
+    dst[dst_size - 1] = '\0';
+
+    // Quitar saltos y espacios al final
+    size_t len = strlen(dst);
+    while (len > 0 && (dst[len - 1] == '\n' || dst[len - 1] == '\r' || isspace((unsigned char)dst[len - 1])))
+        dst[--len] = '\0';
+
+    // Quitar espacios al inicio
+    char *start = dst;
+    while (*start && isspace((unsigned char)*start)) start++;
+
+    // Eliminar comillas exteriores si existen
+    if (start[0] == '"') {
+        size_t slen = strlen(start);
+        if (slen > 1 && start[slen - 1] == '"') {
+            start[slen - 1] = '\0';
+            memmove(start, start + 1, slen - 1);
+        }
+    }
+
+    // Pasar a minúsculas
+    for (char *p = start; *p; ++p) *p = tolower((unsigned char)*p);
+
+    // Si se removieron caracteres al inicio, mover resultado al inicio del dst
+    if (start != dst) memmove(dst, start, strlen(start) + 1);
+}
+
+// --- HASH MD5 coherente con serverSong.c ---
+int hash_mod350_index(const char *artist) {
+    unsigned char digest[MD5_DIGEST_LENGTH];
+    char norm[MAX_ARTIST];
+    normalize_artist(artist, norm, sizeof(norm));
+    MD5((unsigned char*)norm, strlen(norm), digest);
+    unsigned long val = 0;
+    for (int i = 0; i < 3; i++) {
+        val = (val << 8) | digest[i];
+    }
+    return (int)(val % NUM_BUCKETS);
 }
 
 int main(int argc, char **argv) {

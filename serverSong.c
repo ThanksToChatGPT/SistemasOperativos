@@ -8,12 +8,71 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+
 #define NUM_BUCKETS 350
-#define MAX_LINE 4096
+#define MAX_LINE 20000
 #define MAX_ARTIST 512
 #define MAX_SONG 512
 #define FIFO_CLIENT_TO_SERVER "/tmp/client_to_server"
 #define FIFO_SERVER_TO_CLIENT "/tmp/server_to_client"
+
+
+static int parse_line_artist_song(const char *line, char *artist_out, char *song_out) {
+    const char *p = line;
+    char tmp[64];
+    int ti = 0;
+
+    // ======== 1. SACAR EL BUCKET ========
+    while (*p && *p != ',') {
+        if (ti < (int)sizeof(tmp) - 1) tmp[ti++] = *p;
+        p++;
+    }
+    if (*p != ',') return -1;
+    tmp[ti] = '\0';
+    p++; // saltar la coma
+
+    // ======== 2. SACAR EL ARTISTA ========
+    int in_quotes = 0;
+    int ai = 0;
+    if (*p == '"') { in_quotes = 1; p++; }
+
+    while (*p) {
+        if (in_quotes && *p == '"') {
+            p++;
+            if (*p == '"') { // doble comilla -> una sola
+                if (ai < MAX_ARTIST - 1) artist_out[ai++] = '"';
+                p++;
+                continue;
+            }
+            if (*p == ',') { p++; break; }
+            break;
+        } else if (!in_quotes && *p == ',') {
+            p++;
+            break;
+        }
+        if (ai < MAX_ARTIST - 1) artist_out[ai++] = *p;
+        p++;
+    }
+    artist_out[ai] = '\0';
+
+    // convertir artista a minúsculas
+    for (int i = 0; artist_out[i]; i++)
+        artist_out[i] = tolower((unsigned char)artist_out[i]);
+
+    // ======== 3. SACAR LA CANCIÓN ========
+    int si = 0;
+    while (*p && *p != ',') {
+        if (si < MAX_SONG - 1) song_out[si++] = *p;
+        p++;
+    }
+    song_out[si] = '\0';
+
+    // convertir canción a minúsculas
+    for (int i = 0; song_out[i]; i++)
+        song_out[i] = tolower((unsigned char)song_out[i]);
+
+    return 0;
+}
 
 // --- HASH MD5 → bucket (0–349) ---
 // Nueva versión: normaliza el nombre del artista (quita comillas/espacios y pasa a minúsculas)
@@ -129,12 +188,17 @@ int buscar_cancion(const char *artist, const char *song, char *resultado) {
             strcpy(temp, row);
 
             char *bucket_str = strtok(temp, ",");
-            char *a = strtok(NULL, ",");
-            char *s = strtok(NULL, ",");
+            char a[MAX_ARTIST];
+            char s[MAX_SONG];
+            parse_line_artist_song(row, a, s);
 
             if (!a || !s) break;
             trim_quotes(a);
             trim_quotes(s);
+
+            if(!cmp_icase(a, artist)){
+                break;
+            }
 
             if (!found_artist && cmp_icase(a, artist)) {
                 found_artist = 1;

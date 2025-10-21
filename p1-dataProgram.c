@@ -162,7 +162,7 @@ int buscar_cancion(const char *artist, const char *song, char *resultado) {
     size_t cap = 0;
     for (int i = 0; i <= bucket; i++) {
         if (getline(&line, &cap, findex) < 0) {
-            sprintf(resultado, "Bucket %d no encontrado", bucket);
+            sprintf(resultado, "NA\nBucket %d no encontrado", bucket);
             fclose(findex);
             return 0;
         }
@@ -234,10 +234,9 @@ int buscar_cancion(const char *artist, const char *song, char *resultado) {
     free(line);
 
     if (!found_artist){
-        printf("NA\n");
-        sprintf(resultado, "Artista '%s' no encontrado (bucket %d).", artist, bucket);
+        sprintf(resultado, "NA\nArtista '%s' no encontrado (bucket %d).", artist, bucket);
     }else
-        sprintf(resultado, "Canción '%s' no encontrada para '%s'.", song, artist);
+        sprintf(resultado, "NA\nCanción '%s' no encontrada para '%s'.", song, artist);
     return 0;
 }
 
@@ -341,7 +340,6 @@ int run_client(void){
 
 
 int main(int argc, char **argv) {
-    printf("Ejecutando\n");
     if (argc > 1) {
         if (strcmp(argv[1], "server") == 0) { run_server(); return 0; }
         if (strcmp(argv[1], "client") == 0) { run_client(); return 0; }

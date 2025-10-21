@@ -1,7 +1,7 @@
 # Trabajo realizado por:
--Jonathan Felipe Lopez Núñez
--Juan David Castañeda Cárdenas
--Omar Darío Zambrano Galindo
+- Jonathan Felipe Lopez Núñez  
+- Juan David Castañeda Cárdenas  
+- Omar Darío Zambrano Galindo  
 
 # Proyecto Spotify Dataset
 
@@ -14,7 +14,7 @@
 
 ### 1. Preparación del dataset
 
-1. Ejecuta el programa de Python **`Hash.py`** para modificar el contenido del dataset y hacerlo compatible con los demás programas del proyecto.
+1. Ejecuta el programa de Python **`Hash.py`** para modificar el contenido del dataset y hacerlo compatible con los demás programas del proyecto.  
 2. Una vez procesado, cambia el nombre del dataset a **`songs.csv`**, ya que los demás programas del repositorio esperan ese nombre.
 
 ---
@@ -27,8 +27,15 @@ Después de haber modificado el dataset, ejecuta el programa **`crear_indices.c`
 
 ### 3. Ejecución de los programas principales
 
-- El programa **`clienteSong.c`** envía los datos del artista y la canción al servidor.
+- El programa **`clienteSong.c`** envía los datos del artista y la canción al servidor.  
 - Si deseas buscar múltiples artistas, escríbelos separados por comas, por ejemplo:
 
   ```text
   artista1,artista2
+  ```
+
+---
+
+## Nota adicional
+
+Durante el desarrollo de este proyecto se utilizó **ChatGPT** como apoyo para crear parte de la lógica en **C**, usado para resolver dudas de programación y mejorar la estructura del código.  

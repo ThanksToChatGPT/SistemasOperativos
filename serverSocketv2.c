@@ -417,6 +417,86 @@ int buscar_cancion(const char *artist, const char *song, char *resultado) {
     return 0;
 }
 // ----------- FIN DE BUSCAR CANCIÓN -----------
+// ----------- BUSCAR CANCIONES DE ARTISTA(S) -----------
+int buscar_canciones_por_artista(const char *artist, char *resultado) {
+    int bucket = hash_mod350(artist);
+    FILE *findex = fopen("index.csv", "r");
+
+    if (!findex) {
+        sprintf(resultado, "Error: no se pudo abrir index.csv\n");
+        return 0;
+    }
+
+    // Saltar hasta el bucket correspondiente
+    char *line = NULL;
+    size_t cap = 0;
+    for (int i = 0; i <= bucket; i++) {
+        if (getline(&line, &cap, findex) < 0) {
+            sprintf(resultado, "NA\nBucket %d no encontrado", bucket);
+            fclose(findex);
+            return 0;
+        }
+    }
+    fclose(findex);
+
+    // Parsear offsets
+    long offsets[4096];
+    int count = 0;
+    char *tok = strtok(line, ",");
+    while (tok && count < 4096) {
+        offsets[count++] = atol(tok);
+        tok = strtok(NULL, ",");
+    }
+
+    if (count == 0) {
+        sprintf(resultado, "No hay artistas en el bucket %d.", bucket);
+        free(line);
+        return 0;
+    }
+
+    FILE *fsongs = fopen("songs.csv", "r");
+    if (!fsongs) {
+        sprintf(resultado, "Error: no se pudo abrir songs.csv");
+        free(line);
+        return 0;
+    }
+
+    char row[MAX_LINE];
+    int found = 0;
+
+    // Recorrer las posiciones del bucket
+    for (int i = 0; i < count; i++) {
+        fseek(fsongs, offsets[i], SEEK_SET);
+
+        while (fgets(row, sizeof(row), fsongs)) {
+            char a[MAX_ARTIST];
+            char s[MAX_SONG];
+            parse_line_artist_song(row, a, s);
+
+            trim_quotes(a);
+            trim_quotes(s);
+
+            if (!cmp_icase(a, artist)) {
+                break; 
+            }
+
+            // Coincidencia del artista, guardar canción
+            strcat(resultado, s);
+            strcat(resultado, "\n");
+            found = 1;
+        }
+    }
+
+    fclose(fsongs);
+    free(line);
+
+    if (!found) {
+        sprintf(resultado, "NA\nArtista '%s' no encontrado (bucket %d).", artist, bucket);
+        return 0;
+    }
+
+    return 1;
+}
 
 
 int main() {
@@ -503,7 +583,7 @@ int main() {
             case 2: {
                 sscanf(buffer, "@%*d@,@%[^@]@", artist);
                 printf("Petición -> Buscar canciones del artista\n");
-                //Funcion buscar canciones AQUI
+                buscar_canciones_por_artista(artist, resultado);
                 break;
             }
 

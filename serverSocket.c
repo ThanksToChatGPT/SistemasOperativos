@@ -8,7 +8,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <openssl/md5.h>
-
+#include <stdbool.h>
+#include <time.h>
 
 #define MAX_ARTIST 512
 #define MAX_SONG 512
@@ -416,94 +417,216 @@ int buscar_cancion(const char *artist, const char *song, char *resultado) {
     return 0;
 }
 // ----------- FIN DE BUSCAR CANCIÓN -----------
+// ----------- BUSCAR CANCIONES DE ARTISTA(S) -----------
+int buscar_canciones_por_artista(const char *artist, char *resultado) {
+    int bucket = hash_mod350(artist);
+    FILE *findex = fopen("index.csv", "r");
 
-
-int main() {
-    int fd, r;
-        struct sockaddr_in server;
-
-        // Para TCP se debe usar (SOCK_STREAM).
-        // Crear socket UDP
-        fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (fd ==-1) {
-            perror("Error al crear socket");
-            exit(-1);
-        }
-
-        // Configurar estructura servidor
-        server.sin_family = AF_INET;
-        server.sin_port = htons(PORT);
-        server.sin_addr.s_addr = INADDR_ANY;
-        bzero(&server.sin_zero, 8);
-
-
-        // Hacer bind
-        r = bind(fd, (struct sockaddr*)&server, sizeof(struct sockaddr));
-        if (r == -1) {
-            perror("Error en bind");
-            close(fd);
-            exit(-1);
-        }
-
-
-        r = listen(fd, BACKLOG);
-        if (r == -1) {
-            perror("Error en listen");
-            close(fd);
-            exit(-1);
-        }
-
-        // Aceptar conexión
-        socklen_t size = sizeof(struct sockaddr_in);
-        struct sockaddr_in client;
-        int fd2 = accept(fd, (struct sockaddr*)&client, &size);
-        if (fd2 == -1) {
-            perror("Error en accept");
-            close(fd);
-            exit(-1);
-        }
-    
-    while (1) {
-        
-        printf("Conexcion lista. Esperando peticiones...\n");
-
-
-        // Recibir mensaje del cliente
-        char buffer[MAX_ARTIST + MAX_SONG + 5];
-        r = recv(fd2, buffer, MAX_ARTIST + MAX_SONG + 5, 0);
-        if (r == -1) {
-        perror("Error en recv");
-        close(fd2);
-        close(fd);
-        exit(-1);
-        }
-
-        buffer[r] = '\0'; // aseguramos terminación de string
-
-        char artist[MAX_ARTIST], song[MAX_SONG];
-        sscanf(buffer, "%[^|]|%[^\n]", artist, song);
-
-        printf("Buscando '%s' - '%s'\n", artist, song);
-
-        char resultado[MAX_LINE];
-
-        buscar_cancion(artist, song, resultado);
-
-        // Enviar mensaje al cliente
-        r = send(fd2, resultado, MAX_LINE, 0);
-        if (r == -1) {
-        perror("Error en send");
-        close(fd2);
-        close(fd);
-        exit(-1);
-        }
-
-        
-        printf("Respuesta enviada al cliente.\n\n");
+    if (!findex) {
+        sprintf(resultado, "Error: no se pudo abrir index.csv\n");
+        return 0;
     }
+
+    char *line = NULL;
+    size_t cap = 0;
+    for (int i = 0; i <= bucket; i++) {
+        if (getline(&line, &cap, findex) < 0) {
+            sprintf(resultado, "NA\nBucket %d no encontrado", bucket);
+            fclose(findex);
+            return 0;
+        }
+    }
+    fclose(findex);
+
+    long offsets[4096];
+    int count = 0;
+    char *tok = strtok(line, ",");
+    while (tok && count < 4096) {
+        offsets[count++] = atol(tok);
+        tok = strtok(NULL, ",");
+    }
+
+    if (count == 0) {
+        sprintf(resultado, "No hay artistas en el bucket %d.", bucket);
+        free(line);
+        return 0;
+    }
+
+    FILE *fsongs = fopen("songs.csv", "r");
+    if (!fsongs) {
+        sprintf(resultado, "Error: no se pudo abrir songs.csv");
+        free(line);
+        return 0;
+    }
+
+    char row[MAX_LINE];
+    int found = 0;
+
+    for (int i = 0; i < count; i++) {
+        fseek(fsongs, offsets[i], SEEK_SET);
+
+        while (fgets(row, sizeof(row), fsongs)) {
+            char a[MAX_ARTIST];
+            char s[MAX_SONG];
+            parse_line_artist_song(row, a, s);
+
+            trim_quotes(a);
+            trim_quotes(s);
+
+            if (!cmp_icase(a, artist)) {
+                break; 
+            }
+
+            strcat(resultado, s);
+            strcat(resultado, "\n");
+            found = 1;
+        }
+    }
+
+    fclose(fsongs);
+    free(line);
+
+    if (!found) {
+        sprintf(resultado, "NA\nArtista '%s' no encontrado (bucket %d).", artist, bucket);
+        return 0;
+    }
+
+    return 1;
+}
+
+// ----------- AGREGAR CANCIÓN -----------
+int agregar_cancion(const char *artist, const char *song, char *resultado) {
+    FILE *fsongs = fopen("songs.csv", "a");
+    if (!fsongs) {
+        sprintf(resultado, "Error: no se pudo abrir songs.csv");
+        return 0;
+    }
+
+    fprintf(fsongs, "%d,%s,%s,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n", 
+            hash_mod350(artist), artist, song);
+    fclose(fsongs);
+
+    crearIndices();
+
+    sprintf(resultado, "Canción '%s' del artista '%s' agregada exitosamente.", song, artist);
+    return 1;
+}
+// ----------- FIN DE AGREGAR CANCIÓN -----------
+
+
+int main_server() {
+    int fd, r;
+    struct sockaddr_in server;
+    double tiempo_ejecucion;
+    clock_t inicio, fin;
+
+    // Para TCP se debe usar (SOCK_STREAM).
+    // Crear socket UDP
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd ==-1) {
+        perror("Error al crear socket");
+        exit(-1);
+    }
+
+    // Configurar estructura servidor
+    server.sin_family = AF_INET;
+    server.sin_port = htons(PORT);
+    server.sin_addr.s_addr = INADDR_ANY;
+    bzero(&server.sin_zero, 8);
+
+
+    // Hacer bind
+    r = bind(fd, (struct sockaddr*)&server, sizeof(struct sockaddr));
+    if (r == -1) {
+        perror("Error en bind");
+        close(fd);
+        exit(-1);
+    }
+
+
+    r = listen(fd, BACKLOG);
+    if (r == -1) {
+        perror("Error en listen");
+        close(fd);
+        exit(-1);
+    }
+
+    // Aceptar conexión
+    socklen_t size = sizeof(struct sockaddr_in);
+    struct sockaddr_in client;
+    int fd2 = accept(fd, (struct sockaddr*)&client, &size);
+    if (fd2 == -1) {
+        perror("Error en accept");
+        close(fd);
+        exit(-1);
+    }
+    
+    bool running = true;
+    while (running) {
+        printf("\nEsperando petición del cliente...\n");
+
+        char buffer[MAX_ARTIST + MAX_SONG + 476];
+
+        r = recv(fd2, buffer, sizeof(buffer) - 1, 0);
+        if (r == -1) {
+            perror("Error en recv");
+            running = false;  
+            break;
+        } else if (r == 0) {
+            printf("Cliente desconectado.\n");
+            running = false;  
+            break;
+        }
+
+        buffer[r] = '\0';
+        printf("Mensaje recibido.\n");
+
+        int opcion = 0;
+        char artist[MAX_ARTIST];
+        char song[MAX_SONG];
+        char resultado[MAX_LINE];
+        inicio = clock();
+        //Recepción y procesamiento del mensaje.
+        sscanf(buffer, "@%d@", &opcion);
+
+        switch (opcion) {
+            case 1: {
+                sscanf(buffer, "@%*d@,@%[^@]@,@%[^@]@", artist, song);
+                printf("Petición -> Buscar canción\n");
+                memset(resultado, 0, sizeof(resultado));
+                buscar_cancion(artist, song, resultado);
+                break;
+            }
+
+            case 2: {
+                sscanf(buffer, "@%*d@,@%[^@]@", artist);
+                printf("Petición -> Buscar canciones del artista\n");
+                memset(resultado, 0, sizeof(resultado));
+                buscar_canciones_por_artista(artist, resultado);
+                break;
+            }
+
+            case 3: {
+                sscanf(buffer, "@%*d@,@%[^@]@,@%[^@]@", artist, song);
+                printf("Petición -> Agregar canción\n");
+                memset(resultado, 0, sizeof(resultado));
+                agregar_cancion(artist, song, resultado);
+                break;
+            }
+        }
+        fin = clock();
+        //Enviar respuesta al cliente.
+        r = send(fd2, resultado, strlen(resultado), 0);
+        if (r == -1) {
+            perror("Error en send");
+            running = false;
+        }
+        tiempo_ejecucion = ((double)(fin-inicio))/CLOCKS_PER_SEC;
+        printf("Timepo de ejecicion: %.10f", tiempo_ejecucion);
+    }
+    printf("Cerrando servidor...\n");
     close(fd2);
     close(fd);
-
 
     return 0;
 

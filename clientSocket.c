@@ -8,7 +8,7 @@
 #include <stdbool.h>
 
 
-int main() {
+int main_client() {
     int fd, r, opcion;
     bool exitProgram = false;
     struct sockaddr_in cliente;

@@ -4,19 +4,21 @@ CFLAGS  = -Wall -Wextra -O2
 LDFLAGS =
 LDLIBS  = -lcrypto
 
-BIN     = p1-dataProgram
-SRC     = p1-dataProgram.c
+BIN     = p2-dataProgram
+SRC1     = p2-dataProgram.c
+SRC2     = serverSocket.c
+SRC3     = clientSocket.c
 
 all: $(BIN)
 
-$(BIN): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(BIN) $(LDFLAGS) $(LDLIBS)
+$(BIN): $(SRC1) $(SRC2) $(SRC3)
+	$(CC) $(CFLAGS) $(SRC1) $(SRC2) $(SRC3) -o $(BIN) $(LDFLAGS) $(LDLIBS)
 
-run-servidor: $(BIN)
-	./$(BIN) servidor
+server: $(BIN)
+	./$(BIN) server
 
-run-cliente: $(BIN)
-	./$(BIN) cliente
+client: $(BIN)
+	./$(BIN) client
 
 clean:
 	rm -f $(BIN)

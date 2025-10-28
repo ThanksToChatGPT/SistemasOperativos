@@ -27,8 +27,8 @@ Después de haber modificado el dataset, ejecuta el programa **`crear_indices.c`
 
 ### 3. Ejecución de los programas principales
 
-- El programa **`clienteSong.c`** envía los datos del artista y la canción al servidor.
 - Si deseas buscar múltiples artistas, escríbelos separados por comas, por ejemplo:
 
   ```text
   artista1,artista2
+

@@ -49,7 +49,7 @@ int main() {
                 printf("Digite el nombre de la Canción: ");
                 scanf("%[^\n]", song);
 
-                snprintf(message, sizeof(message), "1,%s,%s", artist, song);
+                snprintf(message, sizeof(message), "@1@,@%s@,@%s@", artist, song);
                 r = send(fd, message, strlen(message), 0);
                 if (r == -1) {
                     perror("error en send");
@@ -74,7 +74,7 @@ int main() {
                 printf("\nDigite el nombre del Artista: ");
                 scanf(" %[^\n]", artist);
 
-                snprintf(message, sizeof(message), "2,%s", artist);
+                snprintf(message, sizeof(message), "@2@,@%s@", artist);
 
                 r = send(fd, message, strlen(message), 0);
                 if (r == -1) {
@@ -103,7 +103,7 @@ int main() {
                 printf("Digite el nombre de la Canción que desea agregar: ");
                 scanf("%[^\n]", song);
 
-                snprintf(message, sizeof(message), "3,%s,%s", artist, song);
+                snprintf(message, sizeof(message), "@3@,@%s@,@%s@", artist, song);
                 r = send(fd, message, strlen(message), 0);
                 if (r == -1) {
                     perror("error en send");

@@ -565,7 +565,7 @@ int main() {
     while (running) {
         printf("\nEsperando petición del cliente...\n");
 
-        char buffer[MAX_ARTIST + MAX_SONG + 10];
+        char buffer[MAX_ARTIST + MAX_SONG + 476];
 
         r = recv(fd2, buffer, sizeof(buffer) - 1, 0);
         if (r == -1) {

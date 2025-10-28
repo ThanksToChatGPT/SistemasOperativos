@@ -12,7 +12,7 @@ int main() {
     int fd, r, opcion;
     bool exitProgram = false;
     struct sockaddr_in cliente;
-    char artist[512], song[512], message[1500], buffer[10000];
+    char artist[512], song[512], message[1500], buffer[40000];
     #define PORT 3535
     // Para TCP se debe usar (SOCK_STREAM).
     // Crear socket UDP

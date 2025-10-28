@@ -427,7 +427,6 @@ int buscar_canciones_por_artista(const char *artist, char *resultado) {
         return 0;
     }
 
-    // Saltar hasta el bucket correspondiente
     char *line = NULL;
     size_t cap = 0;
     for (int i = 0; i <= bucket; i++) {
@@ -439,7 +438,6 @@ int buscar_canciones_por_artista(const char *artist, char *resultado) {
     }
     fclose(findex);
 
-    // Parsear offsets
     long offsets[4096];
     int count = 0;
     char *tok = strtok(line, ",");
@@ -464,7 +462,6 @@ int buscar_canciones_por_artista(const char *artist, char *resultado) {
     char row[MAX_LINE];
     int found = 0;
 
-    // Recorrer las posiciones del bucket
     for (int i = 0; i < count; i++) {
         fseek(fsongs, offsets[i], SEEK_SET);
 
@@ -480,7 +477,6 @@ int buscar_canciones_por_artista(const char *artist, char *resultado) {
                 break; 
             }
 
-            // Coincidencia del artista, guardar canción
             strcat(resultado, s);
             strcat(resultado, "\n");
             found = 1;
@@ -497,6 +493,25 @@ int buscar_canciones_por_artista(const char *artist, char *resultado) {
 
     return 1;
 }
+
+// ----------- AGREGAR CANCIÓN -----------
+int agregar_cancion(const char *artist, const char *song, char *resultado) {
+    FILE *fsongs = fopen("songs.csv", "a");
+    if (!fsongs) {
+        sprintf(resultado, "Error: no se pudo abrir songs.csv");
+        return 0;
+    }
+
+    fprintf(fsongs, "%d,%s,%s,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,\n", 
+            hash_mod350(artist), artist, song);
+    fclose(fsongs);
+
+    crearIndices();
+
+    sprintf(resultado, "Canción '%s' del artista '%s' agregada exitosamente.", song, artist);
+    return 1;
+}
+// ----------- FIN DE AGREGAR CANCIÓN -----------
 
 
 int main() {
@@ -590,7 +605,7 @@ int main() {
             case 3: {
                 sscanf(buffer, "@%*d@,@%[^@]@,@%[^@]@", artist, song);
                 printf("Petición -> Agregar canción\n");
-                //Funcion Agregar Cancion AQUI
+                agregar_cancion(artist, song, resultado);
                 break;
             }
         }

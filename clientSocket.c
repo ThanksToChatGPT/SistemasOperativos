@@ -37,17 +37,25 @@ int main() {
     }
      
     while(!exitProgram  ){
+        memset(artist, 0, sizeof(artist));
+        memset(song, 0, sizeof(song));
+        memset(message, 0, sizeof(message));
+        memset(buffer, 0, sizeof(buffer));
+        
         printf("Digite el número de la acción que desea realizar:\n1. Buscar canción\n2. Buscar canciones de un artista\n3. Añadir una nueva canción de un artista\n4. Salir\n\n");
         scanf("%d", &opcion);
+        getchar();
         printf("\n");
 
         switch (opcion) {
             case 1:
                 printf("\nDigite el nombre del Artista: ");
-                scanf("%[^\n]", artist);
+                scanf(" %[^\n]", artist);
+                getchar();
 
                 printf("Digite el nombre de la Canción: ");
-                scanf("%[^\n]", song);
+                scanf(" %[^\n]", song);
+                getchar();
 
                 snprintf(message, sizeof(message), "@1@,@%s@,@%s@", artist, song);
                 r = send(fd, message, strlen(message), 0);
@@ -73,6 +81,7 @@ int main() {
             case 2:   
                 printf("\nDigite el nombre del Artista: ");
                 scanf(" %[^\n]", artist);
+                getchar();
 
                 snprintf(message, sizeof(message), "@2@,@%s@", artist);
 
@@ -98,10 +107,12 @@ int main() {
 
             case 3:
                 printf("\nDigite el nombre del Artista que desea agregar: ");
-                scanf("%[^\n]", artist);
+                scanf(" %[^\n]", artist);
+                getchar();
 
                 printf("Digite el nombre de la Canción que desea agregar: ");
-                scanf("%[^\n]", song);
+                scanf(" %[^\n]", song);
+                getchar();
 
                 snprintf(message, sizeof(message), "@3@,@%s@,@%s@", artist, song);
                 r = send(fd, message, strlen(message), 0);

@@ -1,9 +1,13 @@
-# Trabajo realizado por:
--Jonathan Felipe Lopez Núñez
--Juan David Castañeda Cárdenas
--Omar Darío Zambrano Galindo
-
 # Proyecto Spotify Dataset
+## Integrantes
+
+| Nombre completo                        | Contacto                  |
+|----------------------------------------|----------------------------|
+| Jonathan Felipe Lopez Núñez            | jolopezn@unal.edu.co      |
+| Juan David Castañeda Cárdenas          | jucastanedaca@unal.edu.co |
+| Omar Darío Zambrano Galindo            | ozabrano@unal.edu.co      |
+
+---
 
 ## Dataset utilizado
 [900k Spotify Dataset — Kaggle](https://www.kaggle.com/datasets/devdope/900k-spotify/data?select=spotify_dataset.csv)
@@ -31,4 +35,5 @@ Después de haber modificado el dataset, ejecuta el programa **`crear_indices.c`
 
   ```text
   artista1,artista2
+
 

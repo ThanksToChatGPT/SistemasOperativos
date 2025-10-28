@@ -12,7 +12,7 @@ int main() {
     int fd, r, opcion;
     bool exitProgram = false;
     struct sockaddr_in cliente;
-    char artist[100], song[100], message[250], buffer[1024];
+    char artist[512], song[512], message[1500], buffer[10000];
     #define PORT 3535
     // Para TCP se debe usar (SOCK_STREAM).
     // Crear socket UDP
@@ -64,7 +64,8 @@ int main() {
                     exitProgram=true;
                 }
                 printf("\nMensaje enviado al servidor.\n");
-
+                
+                memset(buffer, 0, sizeof(buffer));
                 r = recv(fd, buffer, sizeof(buffer) - 1, 0);
                 if (r == -1) {
                     perror("error en recv");
@@ -92,6 +93,7 @@ int main() {
                 }
                 printf("\nMensaje enviado al servidor.\n");
 
+                memset(buffer, 0, sizeof(buffer));
                 r = recv(fd, buffer, sizeof(buffer) - 1, 0); 
                 if (r == -1) {
                     perror("error en recv");
@@ -122,6 +124,7 @@ int main() {
                 }
                 printf("\nMensaje enviado al servidor.\n");
 
+                memset(buffer, 0, sizeof(buffer));
                 r = recv(fd, buffer, sizeof(buffer) - 1, 0);
                 if (r == -1) {
                     perror("error en recv");

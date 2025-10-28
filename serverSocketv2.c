@@ -9,7 +9,7 @@
 #include <ctype.h>
 #include <openssl/md5.h>
 #include <stdbool.h>
-
+#include <time.h>
 
 #define MAX_ARTIST 512
 #define MAX_SONG 512
@@ -517,6 +517,8 @@ int agregar_cancion(const char *artist, const char *song, char *resultado) {
 int main() {
     int fd, r;
     struct sockaddr_in server;
+    double tiempo_ejecucion;
+    clock_t inicio, fin;
 
     // Para TCP se debe usar (SOCK_STREAM).
     // Crear socket UDP
@@ -583,7 +585,7 @@ int main() {
         char artist[MAX_ARTIST];
         char song[MAX_SONG];
         char resultado[MAX_LINE];
-
+        inicio = clock();
         //Recepción y procesamiento del mensaje.
         sscanf(buffer, "@%d@", &opcion);
 
@@ -591,6 +593,7 @@ int main() {
             case 1: {
                 sscanf(buffer, "@%*d@,@%[^@]@,@%[^@]@", artist, song);
                 printf("Petición -> Buscar canción\n");
+                memset(resultado, 0, sizeof(resultado));
                 buscar_cancion(artist, song, resultado);
                 break;
             }
@@ -598,6 +601,7 @@ int main() {
             case 2: {
                 sscanf(buffer, "@%*d@,@%[^@]@", artist);
                 printf("Petición -> Buscar canciones del artista\n");
+                memset(resultado, 0, sizeof(resultado));
                 buscar_canciones_por_artista(artist, resultado);
                 break;
             }
@@ -605,18 +609,20 @@ int main() {
             case 3: {
                 sscanf(buffer, "@%*d@,@%[^@]@,@%[^@]@", artist, song);
                 printf("Petición -> Agregar canción\n");
+                memset(resultado, 0, sizeof(resultado));
                 agregar_cancion(artist, song, resultado);
                 break;
             }
         }
-
+        fin = clock();
         //Enviar respuesta al cliente.
         r = send(fd2, resultado, strlen(resultado), 0);
         if (r == -1) {
             perror("Error en send");
             running = false;
         }
-
+        tiempo_ejecucion = ((double)(fin-inicio))/CLOCKS_PER_SEC;
+        printf("Timepo de ejecicion: %.10f", tiempo_ejecucion);
     }
     printf("Cerrando servidor...\n");
     close(fd2);

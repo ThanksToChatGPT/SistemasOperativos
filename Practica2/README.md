@@ -1,5 +1,4 @@
 # Proyecto Spotify Dataset
-
 ## Integrantes
 
 | Nombre completo                        | Contacto                  |
@@ -32,15 +31,8 @@ Después de haber modificado el dataset, ejecuta el programa **`crear_indices.c`
 
 ### 3. Ejecución de los programas principales
 
-- El programa **`clienteSong.c`** envía los datos del artista y la canción al servidor.  
+- El programa **`clienteSong.c`** envía los datos del artista y la canción al servidor.
 - Si deseas buscar múltiples artistas, escríbelos separados por comas, por ejemplo:
 
   ```text
   artista1,artista2
-  ```
-
----
-
-## Nota adicional
-
-Durante el desarrollo de este proyecto se utilizó **ChatGPT** como apoyo para crear parte de la lógica en **C** y **Python**, resolver dudas de programación y mejorar la estructura del código.  

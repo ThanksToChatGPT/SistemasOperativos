@@ -44,7 +44,7 @@ int main() {
     key_t key = 12345;
 
     //Semaforo para leer
-    sem_t *sem = sem_open(SEM_NAME, 0);
+    sem_t *sem = sem_open(SEM_NAME, O_CREAT, 0700, MAX_AGENTES);
     if (sem == SEM_FAILED) {
         perror("Error abriendo semaforo");
         exit(1);

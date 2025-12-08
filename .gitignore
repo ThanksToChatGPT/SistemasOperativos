@@ -5,3 +5,5 @@ test_index.c
 p2-dataProgram
 cliente
 servidor
+impresor
+receptor

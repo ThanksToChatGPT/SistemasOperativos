@@ -1,19 +1,19 @@
-
 #include <stdio.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <semaphore.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <string.h>
 #include <time.h>
 
 #define SHM_NAME "/meminfo_shm"
 #define SEM_NAME "/meminfo_sem"
+#define UMBRAL_STALE 4 
 
 #define MAX_AGENTES 8
 #define IP_LEN 32
-#define UMBRAL_STALE 4    
 
 typedef struct {
     char ip[IP_LEN];
@@ -38,69 +38,64 @@ typedef struct {
     int usados;
 } MemCompartida;
 
+
 int main() {
-    int shm_fd;
-    MemCompartida *mem;
+    int shm_id;
+    key_t key = 12345;
 
-    // Abrir semáforo ya creado por el collector
-    sem_t *sem = sem_open(SEM_NAME, 0);
+    //Semaforo para leer
+    sem_t *sem = sem_open(SEM_NAME, O_CREAT, 0700, MAX_AGENTES);
     if (sem == SEM_FAILED) {
-        perror("sem_open");
+        perror("Error abriendo semaforo");
         exit(1);
     }
 
-    // Abrir memoria compartida
-    shm_fd = shm_open(SHM_NAME, O_RDONLY, 0666);
-    if (shm_fd == -1) {
-        perror("shm_open");
+    shm_id = shmget(key, sizeof(MemCompartida), 0666);
+    if (shm_id < 0) {
+        perror("Error al crear shm_id");
         exit(1);
     }
 
-    mem = mmap(NULL, sizeof(MemCompartida),
-               PROT_READ, MAP_SHARED, shm_fd, 0);
-    if (mem == MAP_FAILED) {
-        perror("mmap");
+    MemCompartida *mem = (MemCompartida *) shmat(shm_id, NULL, 0);
+    if (mem == (void *) -1) {
+        perror("Error al crear apuntador");
         exit(1);
     }
 
     while (1) {
-        // Esperar hasta que collector publique algo
+        //Esperando que se escriba contenido en la memoria
         sem_wait(sem);
 
         system("clear");
         printf("%-15s %-6s %-6s %-6s %-6s %-8s %-8s %-10s %-10s\n",
-               "IP", "CPU%", "User%", "Sys%", "Idle%",
-               "MemUsed", "MemFree", "SwapTotal", "SwapFree");
+       "IP", "CPU%", "User%", "Sys%", "Idle%", "MemUsed","MemFree", "SwapTotal", "SwapFree");
 
         time_t ahora = time(NULL);
 
         for (int i = 0; i < mem->usados; i++) {
             InfoAgente *a = &mem->agentes[i];
 
-            int viejo = (a->ultima_actualizacion == 0) ||
-                        (difftime(ahora, a->ultima_actualizacion) > UMBRAL_STALE);
-
+            int viejo = (a->ultima_actualizacion == 0) || (difftime(ahora, a->ultima_actualizacion) > UMBRAL_STALE);
             // IP
             printf("%-15s ", a->ip);
 
             // CPU
             if (viejo || !a->tiene_cpu)
                 printf("%-6s %-6s %-6s %-6s ",
-                       "---", "---", "---", "---");
+                    "---", "---", "---", "---");
             else
                 printf("%-6.1f %-6.1f %-6.1f %-6.1f ",
-                       a->cpu_usage, a->user_pct, a->system_pct, a->idle_pct);
+                    a->cpu_usage, a->user_pct, a->system_pct, a->idle_pct);
 
             // MEM
             if (viejo || !a->tiene_mem)
                 printf("%-8s %-8s %-10s %-10s\n",
-                       "---", "---", "---", "---");
+                    "---", "---", "---", "---");
             else
                 printf("%-8d %-8d %-10d %-10d\n",
-                       a->mem_used, a->mem_free,
-                       a->swap_total, a->swap_free);
+                    a->mem_used, a->mem_free,
+                    a->swap_total, a->swap_free);
         }
-
         fflush(stdout);
     }
 

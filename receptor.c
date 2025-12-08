@@ -1,5 +1,3 @@
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,13 +5,15 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-
+#include <stdint.h>
 #include <fcntl.h>
-#include <sys/mman.h>
+
+#include <sys/ipc.h>
+#include <sys/shm.h>    
 #include <semaphore.h>
 #include <time.h>
 
-#define SHM_NAME "/meminfo_shm"
+#define SHM_KEY 12345         
 #define SEM_NAME "/meminfo_sem"
 
 #define MAX_AGENTES 8
@@ -32,30 +32,27 @@ typedef struct {
     int swap_total;
     int swap_free;
 
-    int tiene_cpu;                
-    int tiene_mem;            
-    time_t ultima_actualizacion;  
+    int tiene_cpu;
+    int tiene_mem;
+    time_t ultima_actualizacion;
 } InfoAgente;
-
 
 typedef struct {
     InfoAgente agentes[MAX_AGENTES];
-    int usados;   
+    int usados;
 } MemCompartida;
-
 
 MemCompartida *mem;
 sem_t *sem;
 
 int obtener_indice_agente(const char *ip) {
-   
+
     for (int i = 0; i < mem->usados; i++) {
         if (strcmp(mem->agentes[i].ip, ip) == 0) {
             return i;
         }
     }
 
-  
     if (mem->usados < MAX_AGENTES) {
         int idx = mem->usados++;
         memset(&mem->agentes[idx], 0, sizeof(InfoAgente));
@@ -64,20 +61,13 @@ int obtener_indice_agente(const char *ip) {
         return idx;
     }
 
-
     return -1;
 }
-
 
 void procesar_linea(char *linea) {
     char tipo[8];
     char ip[IP_LEN];
 
-    /*
-     Formato esperado:
-        CPU;IP;total;user;sys;idle
-        MEM;IP;used;free;swap_total;swap_free
-    */
     if (strncmp(linea, "CPU;", 4) == 0) {
         float cpu_usage, userp, sysp, idlep;
 
@@ -92,8 +82,8 @@ void procesar_linea(char *linea) {
         a->user_pct = userp;
         a->system_pct = sysp;
         a->idle_pct = idlep;
-        a->tiene_cpu = 1;                       
-        a->ultima_actualizacion = time(NULL);   
+        a->tiene_cpu = 1;
+        a->ultima_actualizacion = time(NULL);
     }
 
     else if (strncmp(linea, "MEM;", 4) == 0) {
@@ -110,11 +100,10 @@ void procesar_linea(char *linea) {
         a->mem_free = free;
         a->swap_total = swap_total;
         a->swap_free = swap_free;
-        a->tiene_mem = 1;                       
-        a->ultima_actualizacion = time(NULL);   
+        a->tiene_mem = 1;
+        a->ultima_actualizacion = time(NULL);
     }
 
-    // Despertar impresor
     sem_post(sem);
 }
 
@@ -131,7 +120,6 @@ void *hilo_cliente(void *arg) {
 
         buffer[r] = '\0';
 
-      
         char *line = strtok(buffer, "\n");
         while (line) {
             procesar_linea(line);
@@ -149,30 +137,23 @@ int main(int argc, char *argv[]) {
 
     int puerto = atoi(argv[1]);
 
-
     sem = sem_open(SEM_NAME, O_CREAT, 0666, 0);
     if (sem == SEM_FAILED) {
         perror("sem_open");
         exit(1);
     }
 
-
-    int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-    if (shm_fd == -1) {
-        perror("shm_open");
+    int shm_id = shmget(SHM_KEY, sizeof(MemCompartida), 0666 | IPC_CREAT);
+    if (shm_id < 0) {
+        perror("shmget");
         exit(1);
     }
 
-    ftruncate(shm_fd, sizeof(MemCompartida));
-
-    mem = mmap(NULL, sizeof(MemCompartida),
-               PROT_READ | PROT_WRITE, MAP_SHARED,
-               shm_fd, 0);
-    if (mem == MAP_FAILED) {
-        perror("mmap");
+    mem = (MemCompartida *) shmat(shm_id, NULL, 0);
+    if (mem == (void *) -1) {
+        perror("shmat");
         exit(1);
     }
-
 
     mem->usados = 0;
 
@@ -182,7 +163,7 @@ int main(int argc, char *argv[]) {
     srv.sin_family = AF_INET;
     srv.sin_port = htons(puerto);
     srv.sin_addr.s_addr = INADDR_ANY;
-    bzero(&srv.sin_zero, 8);
+    memset(srv.sin_zero, 0, 8);
 
     if (bind(fd, (struct sockaddr *)&srv, sizeof(srv)) < 0) {
         perror("bind");
@@ -199,13 +180,7 @@ int main(int argc, char *argv[]) {
         int fd_cli = accept(fd, (struct sockaddr *)&cli, &sz);
         if (fd_cli < 0) continue;
 
-        /
-        int r = send(fd_cli, "Servidor conectado", 18, 0);
-        if (r <= 0) {
-            close(fd_cli);
-            continue;
-        }
-
+        send(fd_cli, "Servidor conectado", 18, 0);
 
         pthread_t tid;
         pthread_create(&tid, NULL, hilo_cliente, (void*)(intptr_t)fd_cli);
